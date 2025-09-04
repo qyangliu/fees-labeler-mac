@@ -33,7 +33,7 @@ jobs:
         env:
           TK_SILENCE_DEPRECATION: "1"
         run: |
-          pyinstaller --windowed --name "FEES-Labeler" fees_labeler.py
+          pyinstaller --windowed --name "FEES-Labeler" visibility_appv2.py
           ls -la dist
 
       - name: Create DMG
