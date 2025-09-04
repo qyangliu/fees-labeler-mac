@@ -7,14 +7,18 @@ on:
 
 jobs:
   build:
-    name: Build FEES-Labeler for macOS (Apple Silicon)
-    runs-on: macos-14  # Apple Silicon runner
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    name: Build FEES-Labeler (Apple Silicon)
+    runs-on: macos-14
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Print runner OS (sanity check)
+        run: |
+          echo "Runner OS: $RUNNER_OS"
+          uname -a
+
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -39,7 +43,6 @@ jobs:
             --app-drop-link 600 185 \
             "FEES-Labeler-arm64.dmg" \
             "app/dist/FEES-Labeler.app"
-          ls -la
 
       - name: Upload artifacts (.app + .dmg)
         uses: actions/upload-artifact@v4
