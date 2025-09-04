@@ -1,0 +1,50 @@
+name: build-mac
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build FEES-Labeler for macOS (Apple Silicon)
+    runs-on: macos-14  # Apple Silicon runner
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          brew install create-dmg
+
+      - name: Build .app with PyInstaller
+        working-directory: app
+        env:
+          TK_SILENCE_DEPRECATION: "1"
+        run: |
+          pyinstaller --windowed --name "FEES-Labeler" fees_labeler.py
+          ls -la dist
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "FEES-Labeler-arm64" \
+            --app-drop-link 600 185 \
+            "FEES-Labeler-arm64.dmg" \
+            "app/dist/FEES-Labeler.app"
+          ls -la
+
+      - name: Upload artifacts (.app + .dmg)
+        uses: actions/upload-artifact@v4
+        with:
+          name: FEES-Labeler-arm64
+          path: |
+            FEES-Labeler-arm64.dmg
+            app/dist/FEES-Labeler.app
