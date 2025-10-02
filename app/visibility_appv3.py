@@ -275,32 +275,44 @@ class LabelApp:
             with open(csv_path, newline="") as f:
                 reader = csv.reader(f)
                 header = next(reader, None)
-                new_style = False
-                if header:
-                    new_style = any(f"{s}_overridden" in header for s in STRUCTURE_COLUMNS)
                 for row in reader:
                     try:
-                        video = int(row[0]); swallow = int(row[1]); frame = int(row[2])
+                        video = int(row[0]);
+                        swallow = int(row[1]);
+                        frame = int(row[2])
                     except ValueError:
                         continue
                     key = (video, swallow, frame)
-                    if new_style:
-                        checkbox_state = []
-                        ptr = 3
-                        for _ in STRUCTURE_COLUMNS:
-                            val = int(row[ptr])
-                            checkbox_state.append(1 if val == 1 else 0)
-                            ptr += 2
-                        self.frame_states[key] = checkbox_state
-                    else:
-                        checkbox_state = []
-                        for i, _s in enumerate(STRUCTURE_COLUMNS):
-                            try:
-                                vis = int(row[3 + i])
-                            except Exception:
-                                vis = 0
-                            checkbox_state.append(1 if vis == 1 else 0)
-                        self.frame_states[key] = checkbox_state
+
+                    checkbox_state = []
+                    if header:
+                        # NEW schema: *_sev, *_vis
+                        if any(f"{s}_vis" in header for s in STRUCTURE_COLUMNS):
+                            for s in STRUCTURE_COLUMNS:
+                                vis_idx = header.index(f"{s}_vis")
+                                # compute base index for this structure
+                                base = 3 + 2 * STRUCTURE_COLUMNS.index(s)
+                                sev = int(row[base])  # not used here
+                                vis = int(row[base + 1])  # *_vis
+                                checkbox_state.append(1 if vis == 1 else 0)
+
+                        # OLD schema: *_val (was checkbox), *_overridden (mismatch)
+                        elif any(f"{s}_overridden" in header for s in STRUCTURE_COLUMNS):
+                            ptr = 3
+                            for _ in STRUCTURE_COLUMNS:
+                                vis = int(row[ptr])  # *_val used to be visibility
+                                checkbox_state.append(1 if vis == 1 else 0)
+                                ptr += 2
+
+                        # VERY OLD schema: one column per structure (visibility only)
+                        else:
+                            for i, _s in enumerate(STRUCTURE_COLUMNS):
+                                try:
+                                    vis = int(row[3 + i])
+                                except Exception:
+                                    vis = 0
+                                checkbox_state.append(1 if vis == 1 else 0)
+                    self.frame_states[key] = checkbox_state
         except Exception as e:
             messagebox.showwarning("CSV load warning", f"Could not load existing CSV:\n{e}")
 
@@ -461,22 +473,22 @@ class LabelApp:
         if not self.output_csv:
             return
         header = ["video", "swallow", "frame"]
+        # write severity (from preload) + visibility (from checkbox)
         for s in STRUCTURE_COLUMNS:
-            header += [f"{s}_val", f"{s}_overridden"]
+            header += [f"{s}_sev", f"{s}_vis"]
 
         ensure_dir(self.output_csv)
         with open(self.output_csv, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(header)
             for (video, swallow, frame), checkbox_state in sorted(self.frame_states.items()):
-                defaults = self.get_swallow_defaults(video, swallow)
+                defaults = self.get_swallow_defaults(video, swallow)  # severities 0–4
                 row = [video, swallow, frame]
                 for idx, s in enumerate(STRUCTURE_COLUMNS):
-                    kept = checkbox_state[idx]
-                    vis = 1 if kept == 1 else 0
-                    overridden = 1 if vis != defaults[idx] else 0
-                    row.append(vis)
-                    row.append(overridden)
+                    sev = int(defaults[idx]) if pd.notna(defaults[idx]) else 0
+                    vis = 1 if checkbox_state[idx] == 1 else 0
+                    row.append(sev)  # *_sev
+                    row.append(vis)  # *_vis
                 writer.writerow(row)
 
     def save_and_next(self):
